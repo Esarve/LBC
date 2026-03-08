@@ -1,20 +1,41 @@
-// JS implementation of the
+/**
+ * Base Code = https://www.geeksforgeeks.org/dsa/n-queen-problem-local-search-using-hill-climbing-with-random-neighbour/
+ * Modified for AMOD 5470H - Assignment 2 - N-Queen Problem
+ * By: Sourav Das, Student ID: 0884762
+ *
+ * Acknowledgment: I have referred to the original code for structure and logic,
+ * but I have rewritten and commented the code extensively to ensure it is my own work and to enhance readability.
+ * 
+ * The base code uses a hill climbing algorithm with random neighbor selection to solve the N-Queen problem, which is a classic combinatorial optimization problem.
+ * This will be converted to a Local Beam Search algorithm for the assignment.
+ *
+ */
+
+// C++ implementation of the
 // above approach
-let  N = 8
+#include <iostream>
+#include <math.h>
+
+#define N 8
+using namespace std;
 
 // A utility function that configures
 // the 2D array "board" and
 // array "state" randomly to provide
 // a starting point for the algorithm.
-function configureRandomly(board, state)
+void configureRandomly(int board[][N],
+                       int* state)
 {
+
+    // Seed for the random function
+    srand(time(0));
 
     // Iterating through the
     // column indices
-    for (var i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
 
         // Getting a random row index
-        state[i] = Math.floor(Math.random() * 100000) % N;
+        state[i] = rand() % N;
 
         // Placing a queen on the
         // obtained place in
@@ -25,38 +46,38 @@ function configureRandomly(board, state)
 
 // A utility function that prints
 // the 2D array "board".
-function printBoard(board)
+void printBoard(int board[][N])
 {
 
-    for (var i = 0; i < N; i++) {
-        process.stdout.write(" ");
-        for (var j = 0; j < N; j++) {
-            process.stdout.write(board[i][j] + " ");
+    for (int i = 0; i < N; i++) {
+        cout << " ";
+        for (int j = 0; j < N; j++) {
+            cout << board[i][j] << " ";
         }
-        process.stdout.write("\n");
+        cout << "\n";
     }
 }
 
 // A utility function that prints
 // the array "state".
-function printState( state)
+void printState(int* state)
 {
 
-    for (var i = 0; i < N; i++) {
-       process.stdout.write(" " + state[i] + " ");
+    for (int i = 0; i < N; i++) {
+        cout << " " << state[i] << " ";
     }
-    process.stdout.write("\n");
+    cout << endl;
 }
 
 // A utility function that compares
 // two arrays, state1 and state2 and
 // returns true if equal
 // and false otherwise.
-function compareStates(state1,
-                   state2)
+bool compareStates(int* state1,
+                   int* state2)
 {
 
-    for (var i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
         if (state1[i] != state2[i]) {
             return false;
         }
@@ -67,10 +88,10 @@ function compareStates(state1,
 // A utility function that fills
 // the 2D array "board" with
 // values "value"
-function fill(board, value)
+void fill(int board[][N], int value)
 {
-    for (var i = 0; i < N; i++) {
-        for (var j = 0; j < N; j++) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
             board[i][j] = value;
         }
     }
@@ -81,8 +102,8 @@ function fill(board, value)
 // state(queens attacking each other)
 // using the board by the
 // following logic.
-function calculateObjective( board,
-                        state)
+int calculateObjective(int board[][N],
+                       int* state)
 {
 
     // For each queen in a column, we check
@@ -93,13 +114,13 @@ function calculateObjective( board,
 
     // Number of queens attacking each other,
     // initially zero.
-    var attacking = 0;
+    int attacking = 0;
 
     // Variables to index a particular
     // row and column on board.
-    var row, col;
+    int row, col;
 
-    for (var i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
 
         // At each column 'i', the queen is
         // placed at row 'state[i]', by the
@@ -189,28 +210,28 @@ function calculateObjective( board,
     }
 
     // Return pairs.
-    return Math.floor(attacking / 2);
+    return (int)(attacking / 2);
 }
 
 // A utility function that
 // generates a board configuration
 // given the state.
-function generateBoard( board,
-                   state)
+void generateBoard(int board[][N],
+                   int* state)
 {
 
     fill(board, 0);
-    for (var i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
         board[state[i]][i] = 1;
     }
 }
 
 // A utility function that copies
 // contents of state2 to state1.
-function copyState( state1, state2)
+void copyState(int* state1, int* state2)
 {
 
-    for (var i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) {
         state1[i] = state2[i];
     }
 }
@@ -220,18 +241,16 @@ function copyState( state1, state2)
 // the least objective value
 // amongst all neighbours as
 // well as the current state.
-function getNeighbour(board,
-                  state)
+void getNeighbour(int board[][N],
+                  int* state)
 {
     // Declaring and initializing the
     // optimal board and state with
     // the current board and the state
     // as the starting point.
 
-    var opBoard = new Array(N);
-    for (var i = 0; i < N; i++)
-        opBoard[i] = new Array(N).fill(0);
-    var opState = new Array(N).fill(0);
+    int opBoard[N][N];
+    int opState[N];
 
     copyState(opState,
               state);
@@ -241,7 +260,8 @@ function getNeighbour(board,
     // Initializing the optimal
     // objective value
 
-    var opObjective  = calculateObjective(opBoard,
+    int opObjective
+        = calculateObjective(opBoard,
                              opState);
 
     // Declaring and initializing
@@ -249,8 +269,9 @@ function getNeighbour(board,
     // state for the purpose
     // of computation.
 
-    var NeighbourBoard = new Array(N).fill(new Array(N).fill(0));
-    var NeighbourState = new Array(N).fill(0);
+    int NeighbourBoard[N][N];
+    int NeighbourState[N];
+
     copyState(NeighbourState,
               state);
     generateBoard(NeighbourBoard,
@@ -260,8 +281,8 @@ function getNeighbour(board,
     // possible neighbours
     // of the board.
 
-    for (var i = 0; i < N; i++) {
-        for (var j = 0; j < N; j++) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
 
             // Condition for skipping the
             // current state
@@ -281,7 +302,7 @@ function getNeighbour(board,
                 // Calculating the objective
                 // value of the neighbour.
 
-                var temp
+                int temp
                     = calculateObjective(
                         NeighbourBoard,
                         NeighbourState);
@@ -321,7 +342,8 @@ function getNeighbour(board,
     generateBoard(board, state);
 }
 
-function hillClimbing(board, state)
+void hillClimbing(int board[][N],
+                  int* state)
 {
 
     // Declaring  and initializing the
@@ -329,10 +351,8 @@ function hillClimbing(board, state)
     // the current board and the state
     // as the starting point.
 
-    var neighbourBoard = new Array(N);
-    for (var i = 0; i < N; i++)
-        neighbourBoard[i] = new Array(N).fill(0);
-    var neighbourState = new Array(N).fill(0)
+    int neighbourBoard[N][N] = {};
+    int neighbourState[N];
 
     copyState(neighbourState, state);
     generateBoard(neighbourBoard,
@@ -379,8 +399,8 @@ function hillClimbing(board, state)
             // to escape it.
 
             // Random neighbour
-            neighbourState[(Math.floor(Math.random() * 100000) % N)]
-                = Math.floor(Math.random() * 100000) % N;
+            neighbourState[rand() % N]
+                = rand() % N;
             generateBoard(neighbourBoard,
                           neighbourState);
         }
@@ -389,10 +409,11 @@ function hillClimbing(board, state)
 }
 
 // Driver code
-var state = new Array(N).fill(0);
-var board =  new Array(N);
-for (var i = 0; i < N; i++)
-        board[i] = new Array(N).fill(0);
+int main()
+{
+
+    int state[N] = {};
+    int board[N][N] = {};
 
     // Getting a starting point by
     // randomly configuring the board
@@ -402,4 +423,5 @@ for (var i = 0; i < N; i++)
     // board obtained
     hillClimbing(board, state);
 
-// This code is contributed by phasing17.
+    return 0;
+}
