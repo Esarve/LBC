@@ -15,8 +15,14 @@
 // above approach
 #include <iostream>
 #include <math.h>
+#include <cstdlib>
+#include <ctime>
 
 #define N 8
+#define BEAM_WIDTH 4
+#define MAX_ITERATIONS 1000
+#define SUCCESSOR_COUNT (N * (N - 1))
+#define SUCCESSOR_POOL_SIZE (BEAM_WIDTH * SUCCESSOR_COUNT)
 using namespace std;
 
 // A utility function that configures
@@ -26,10 +32,6 @@ using namespace std;
 void configureRandomly(int board[][N],
                        int* state)
 {
-
-    // Seed for the random function
-    srand(time(0));
-
     // Iterating through the
     // column indices
     for (int i = 0; i < N; i++) {
@@ -236,192 +238,114 @@ void copyState(int* state1, int* state2)
     }
 }
 
-// This function gets the neighbour
-// of the current state having
-// the least objective value
-// amongst all neighbours as
-// well as the current state.
-void getNeighbour(int board[][N],
-                  int* state)
-{
-    // Declaring and initializing the
-    // optimal board and state with
-    // the current board and the state
-    // as the starting point.
+// run local beam search with a fixed number of parallel states
+// returns true when we hit objective 0
+bool localBeamSearch(int board[][N], int* state) {
+    int currentBeamStates[BEAM_WIDTH][N] = {};
+    int currentBeamBoards[BEAM_WIDTH][N][N] = {};
+    int currentBeamObjectives[BEAM_WIDTH] = {};
 
-    int opBoard[N][N];
-    int opState[N];
+    for (int i = 0; i < BEAM_WIDTH; i++) {
+        configureRandomly(currentBeamBoards[i], currentBeamStates[i]);
+        currentBeamObjectives[i]
+            = calculateObjective(currentBeamBoards[i], currentBeamStates[i]);
 
-    copyState(opState,
-              state);
-    generateBoard(opBoard,
-                  opState);
+        if (currentBeamObjectives[i] == 0) {
+            copyState(state, currentBeamStates[i]);
+            generateBoard(board, state);
+            return true;
+        }
+    }
 
-    // Initializing the optimal
-    // objective value
+    for (int iterationNumber = 0; iterationNumber < MAX_ITERATIONS; iterationNumber++) {
+        int successorStatesPool[SUCCESSOR_POOL_SIZE][N] = {};
+        int successorObjectiveValues[SUCCESSOR_POOL_SIZE] = {};
+        bool isSelected[SUCCESSOR_POOL_SIZE] = {};
+        int successorCount = 0;
 
-    int opObjective
-        = calculateObjective(opBoard,
-                             opState);
+        for (int beamIndex = 0; beamIndex < BEAM_WIDTH; beamIndex++) {
+            for (int columnIndex = 0; columnIndex < N; columnIndex++) {
+                for (int rowIndex = 0; rowIndex < N; rowIndex++) {
+                    if (rowIndex == currentBeamStates[beamIndex][columnIndex]) {
+                        continue;
+                    }
 
-    // Declaring and initializing
-    // the temporary board and
-    // state for the purpose
-    // of computation.
+                    copyState(successorStatesPool[successorCount], currentBeamStates[beamIndex]);
+                    successorStatesPool[successorCount][columnIndex] = rowIndex;
 
-    int NeighbourBoard[N][N];
-    int NeighbourState[N];
+                    int candidateBoard[N][N] = {};
+                    generateBoard(candidateBoard, successorStatesPool[successorCount]);
+                    successorObjectiveValues[successorCount]
+                        = calculateObjective(candidateBoard, successorStatesPool[successorCount]);
 
-    copyState(NeighbourState,
-              state);
-    generateBoard(NeighbourBoard,
-                  NeighbourState);
+                    successorCount++;
+                }
+            }
+        }
 
-    // Iterating through all
-    // possible neighbours
-    // of the board.
+        // pick top beam states in a deterministic way so ties stay predictable
+        for (int beamSlot = 0; beamSlot < BEAM_WIDTH; beamSlot++) {
+            int best_index = -1;
 
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-
-            // Condition for skipping the
-            // current state
-
-            if (j != state[i]) {
-
-                // Initializing temporary
-                // neighbour with the
-                // current neighbour.
-
-                NeighbourState[i] = j;
-                NeighbourBoard[NeighbourState[i]][i]
-                    = 1;
-                NeighbourBoard[state[i]][i]
-                    = 0;
-
-                // Calculating the objective
-                // value of the neighbour.
-
-                int temp
-                    = calculateObjective(
-                        NeighbourBoard,
-                        NeighbourState);
-
-                // Comparing temporary and optimal
-                // neighbour objectives and if
-                // temporary is less than optimal
-                // then updating accordingly.
-
-                if (temp <= opObjective) {
-                    opObjective = temp;
-                    copyState(opState,
-                              NeighbourState);
-                    generateBoard(opBoard,
-                                  opState);
+            for (int successorIndex = 0; successorIndex < successorCount; successorIndex++) {
+                if (isSelected[successorIndex]) {
+                    continue;
                 }
 
-                // Going back to the original
-                // configuration for the next
-                // iteration.
+                if (best_index == -1
+                    || successorObjectiveValues[successorIndex]
+                        < successorObjectiveValues[best_index]) {
+                    best_index = successorIndex;
+                }
+            }
 
-                NeighbourBoard[NeighbourState[i]][i]
-                    = 0;
-                NeighbourState[i] = state[i];
-                NeighbourBoard[state[i]][i] = 1;
+            if (best_index == -1) {
+                break;
+            }
+
+            isSelected[best_index] = true;
+            copyState(currentBeamStates[beamSlot], successorStatesPool[best_index]);
+            generateBoard(currentBeamBoards[beamSlot], currentBeamStates[beamSlot]);
+            currentBeamObjectives[beamSlot]
+                = successorObjectiveValues[best_index];
+
+            if (currentBeamObjectives[beamSlot] == 0) {
+                copyState(state, currentBeamStates[beamSlot]);
+                generateBoard(board, state);
+                return true;
             }
         }
     }
 
-    // Copying the optimal board and
-    // state thus found to the current
-    // board and, state since c++ doesn't
-    // allow returning multiple values.
+    // if no perfect state is found, return the best one we got
+    int bestBeamIndex = 0;
+    for (int i = 1; i < BEAM_WIDTH; i++) {
+        if (currentBeamObjectives[i] < currentBeamObjectives[bestBeamIndex]) {
+            bestBeamIndex = i;
+        }
+    }
 
-    copyState(state, opState);
-    fill(board, 0);
+    copyState(state, currentBeamStates[bestBeamIndex]);
     generateBoard(board, state);
-}
-
-void hillClimbing(int board[][N],
-                  int* state)
-{
-
-    // Declaring  and initializing the
-    // neighbour board and state with
-    // the current board and the state
-    // as the starting point.
-
-    int neighbourBoard[N][N] = {};
-    int neighbourState[N];
-
-    copyState(neighbourState, state);
-    generateBoard(neighbourBoard,
-                  neighbourState);
-
-    do {
-
-        // Copying the neighbour board and
-        // state to the current board and
-        // state, since a neighbour
-        // becomes current after the jump.
-
-        copyState(state, neighbourState);
-        generateBoard(board, state);
-
-        // Getting the optimal neighbour
-
-        getNeighbour(neighbourBoard,
-                     neighbourState);
-
-        if (compareStates(state,
-                          neighbourState)) {
-
-            // If neighbour and current are
-            // equal then no optimal neighbour
-            // exists and therefore output the
-            // result and break the loop.
-
-            printBoard(board);
-            break;
-        }
-        else if (calculateObjective(board,
-                                    state)
-                 == calculateObjective(
-                        neighbourBoard,
-                        neighbourState)) {
-
-            // If neighbour and current are
-            // not equal but their objectives
-            // are equal then we are either
-            // approaching a shoulder or a
-            // local optimum, in any case,
-            // jump to a random neighbour
-            // to escape it.
-
-            // Random neighbour
-            neighbourState[rand() % N]
-                = rand() % N;
-            generateBoard(neighbourBoard,
-                          neighbourState);
-        }
-
-    } while (true);
+    return false;
 }
 
 // Driver code
-int main()
-{
+int main() {
+    srand(time(0));
 
     int state[N] = {};
     int board[N][N] = {};
 
-    // Getting a starting point by
-    // randomly configuring the board
-    configureRandomly(board, state);
+    bool isSolutionFound = localBeamSearch(board, state);
 
-    // Do hill climbing on the
-    // board obtained
-    hillClimbing(board, state);
+    if (isSolutionFound) {
+        cout << "Solution found using Local Beam Search:\n";
+    } else {
+        cout << "No exact solution found within iteration limit. Best state:\n";
+    }
+
+    printBoard(board);
 
     return 0;
 }
