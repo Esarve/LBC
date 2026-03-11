@@ -15,14 +15,15 @@
 // above approach
 #include <iostream>
 #include <math.h>
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 
 #define N 8
-#define BEAM_WIDTH 4
+#define k 4
 #define MAX_ITERATIONS 1000
 #define SUCCESSOR_COUNT (N * (N - 1))
-#define SUCCESSOR_POOL_SIZE (BEAM_WIDTH * SUCCESSOR_COUNT)
+#define SUCCESSOR_POOL_SIZE (k * SUCCESSOR_COUNT)
 using namespace std;
 
 // A utility function that configures
@@ -241,11 +242,11 @@ void copyState(int* state1, int* state2)
 // run local beam search with a fixed number of parallel states
 // returns true when we hit objective 0
 bool localBeamSearch(int board[][N], int* state) {
-    int currentBeamStates[BEAM_WIDTH][N] = {};
-    int currentBeamBoards[BEAM_WIDTH][N][N] = {};
-    int currentBeamObjectives[BEAM_WIDTH] = {};
+    int currentBeamStates[k][N] = {};
+    int currentBeamBoards[k][N][N] = {};
+    int currentBeamObjectives[k] = {};
 
-    for (int i = 0; i < BEAM_WIDTH; i++) {
+    for (int i = 0; i < k; i++) {
         configureRandomly(currentBeamBoards[i], currentBeamStates[i]);
         currentBeamObjectives[i]
             = calculateObjective(currentBeamBoards[i], currentBeamStates[i]);
@@ -257,13 +258,15 @@ bool localBeamSearch(int board[][N], int* state) {
         }
     }
 
+    int previousBestObjective = *min_element(currentBeamObjectives, currentBeamObjectives + k);
+
     for (int iterationNumber = 0; iterationNumber < MAX_ITERATIONS; iterationNumber++) {
         int successorStatesPool[SUCCESSOR_POOL_SIZE][N] = {};
         int successorObjectiveValues[SUCCESSOR_POOL_SIZE] = {};
         bool isSelected[SUCCESSOR_POOL_SIZE] = {};
         int successorCount = 0;
 
-        for (int beamIndex = 0; beamIndex < BEAM_WIDTH; beamIndex++) {
+        for (int beamIndex = 0; beamIndex < k; beamIndex++) {
             for (int columnIndex = 0; columnIndex < N; columnIndex++) {
                 for (int rowIndex = 0; rowIndex < N; rowIndex++) {
                     if (rowIndex == currentBeamStates[beamIndex][columnIndex]) {
@@ -284,7 +287,7 @@ bool localBeamSearch(int board[][N], int* state) {
         }
 
         // pick top beam states in a deterministic way so ties stay predictable
-        for (int beamSlot = 0; beamSlot < BEAM_WIDTH; beamSlot++) {
+        for (int beamSlot = 0; beamSlot < k; beamSlot++) {
             int best_index = -1;
 
             for (int successorIndex = 0; successorIndex < successorCount; successorIndex++) {
@@ -315,11 +318,18 @@ bool localBeamSearch(int board[][N], int* state) {
                 return true;
             }
         }
+
+        // Check for local minimum: no improvement over previous best
+        int newBestObjective = *min_element(currentBeamObjectives, currentBeamObjectives + k);
+        if (newBestObjective >= previousBestObjective) {
+            break;
+        }
+        previousBestObjective = newBestObjective;
     }
 
     // if no perfect state is found, return the best one we got
     int bestBeamIndex = 0;
-    for (int i = 1; i < BEAM_WIDTH; i++) {
+    for (int i = 1; i < k; i++) {
         if (currentBeamObjectives[i] < currentBeamObjectives[bestBeamIndex]) {
             bestBeamIndex = i;
         }
@@ -337,15 +347,22 @@ int main() {
     int state[N] = {};
     int board[N][N] = {};
 
+    clock_t startTime = clock();
     bool isSolutionFound = localBeamSearch(board, state);
+    clock_t endTime = clock();
+
+    double elapsedTime = (double)(endTime - startTime) / CLOCKS_PER_SEC;
+    int attackingPairs = calculateObjective(board, state);
 
     if (isSolutionFound) {
         cout << "Solution found using Local Beam Search:\n";
     } else {
-        cout << "No exact solution found within iteration limit. Best state:\n";
+        cout << "Local minimum reached. Best board configuration:\n";
     }
 
     printBoard(board);
+    cout << "Number of attacking pairs: " << attackingPairs << "\n";
+    cout << "Time taken: " << elapsedTime << " seconds\n";
 
     return 0;
 }
