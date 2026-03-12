@@ -19,8 +19,12 @@
 #include <cstdlib>
 #include <ctime>
 
+#ifndef N
 #define N 8
+#endif
+#ifndef k
 #define k 4
+#endif
 #define MAX_ITERATIONS 1000
 #define SUCCESSOR_COUNT (N * (N - 1))
 #define SUCCESSOR_POOL_SIZE (k * SUCCESSOR_COUNT)
@@ -259,6 +263,8 @@ bool localBeamSearch(int board[][N], int* state) {
     }
 
     int previousBestObjective = *min_element(currentBeamObjectives, currentBeamObjectives + k);
+    int noImprovementCount = 0;
+    const int PATIENCE = 10;
 
     for (int iterationNumber = 0; iterationNumber < MAX_ITERATIONS; iterationNumber++) {
         int successorStatesPool[SUCCESSOR_POOL_SIZE][N] = {};
@@ -306,6 +312,20 @@ bool localBeamSearch(int board[][N], int* state) {
                 break;
             }
 
+            // Check it isn't a duplicate of already selected beams
+            bool isDuplicate = false;
+            for (int prev = 0; prev < beamSlot; prev++) {
+                if (compareStates(successorStatesPool[best_index], currentBeamStates[prev])) {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+            if (isDuplicate) {
+                isSelected[best_index] = true; // skip it
+                beamSlot--; // retry this slot
+                continue;
+            }
+
             isSelected[best_index] = true;
             copyState(currentBeamStates[beamSlot], successorStatesPool[best_index]);
             generateBoard(currentBeamBoards[beamSlot], currentBeamStates[beamSlot]);
@@ -322,9 +342,12 @@ bool localBeamSearch(int board[][N], int* state) {
         // Check for local minimum: no improvement over previous best
         int newBestObjective = *min_element(currentBeamObjectives, currentBeamObjectives + k);
         if (newBestObjective >= previousBestObjective) {
-            break;
+            noImprovementCount++;
+            if (noImprovementCount >= PATIENCE) break;
+        } else {
+            noImprovementCount = 0;
+            previousBestObjective = newBestObjective;
         }
-        previousBestObjective = newBestObjective;
     }
 
     // if no perfect state is found, return the best one we got
@@ -342,7 +365,7 @@ bool localBeamSearch(int board[][N], int* state) {
 
 // Driver code
 int main() {
-    srand(time(0));
+    srand(time(0) + clock());
 
     int state[N] = {};
     int board[N][N] = {};
